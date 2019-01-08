@@ -10,10 +10,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "arg.h"
+
 #define PORT   "2023"
 #define BACKLOG 32 /* XXX What's a reasonable value? */
 #define BASEURI "https://paste.bitmanent.org/p"
 
+char *argv0;
+
+/* function implementations */
 void
 die(const char *errstr, ...) {
 	va_list ap;
@@ -98,6 +103,10 @@ main(int argc, char *argv[]) {
 	socklen_t size;
 	int sd, csd, len, tmpsd;
 	char tmpfn[64] = {0}, *buf, *p;
+
+	ARGBEGIN {
+	case 'v': die("beans-"VERSION"\n");
+	} ARGEND
 
 	sd = bindon(PORT);
 	size = sizeof conn;
