@@ -12,11 +12,13 @@
 
 #include "arg.h"
 
-#define PORT   "2023"
 #define BACKLOG 32 /* XXX What's a reasonable value? */
-#define BASEURI "https://paste.bitmanent.org/p"
 
 char *argv0;
+
+char port[8] = "2023";
+char base[256] = "";
+char path[256] = "/tmp";
 
 /* function implementations */
 void
@@ -105,10 +107,13 @@ main(int argc, char *argv[]) {
 	char tmpfn[64] = {0}, *buf, *p;
 
 	ARGBEGIN {
+	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
+	case 'b': strncpy(base, EARGF(die("%s: missing base URL\n", argv0)), sizeof base); break;
+	case 'p': strncpy(port, EARGF(die("%s: missing port\n", argv0)), sizeof port); break;
 	case 'v': die("beans-"VERSION"\n");
 	} ARGEND
 
-	sd = bindon(PORT);
+	sd = bindon(port);
 	size = sizeof conn;
 	while(1) {
 		csd = accept(sd, (struct sockaddr *)&conn, &size);
@@ -122,7 +127,7 @@ main(int argc, char *argv[]) {
 			close(csd);
 			continue;
 		}
-		snprintf(tmpfn, sizeof tmpfn, "/tmp/beans.XXXXXX");
+		snprintf(tmpfn, sizeof tmpfn, "%s/beans.XXXXXX", path);
 		tmpsd = mkstemp(tmpfn);
 		if(tmpsd == -1) {
 			fprintf(stderr, "mkstemp()\n");
@@ -134,7 +139,7 @@ main(int argc, char *argv[]) {
 			fprintf(stderr, "write(): %s\n", strerror(errno));
 		p = strchr(tmpfn, '.');
 		if(p && ++p)
-			sout(csd, "%s/%s\n", BASEURI, p);
+			sout(csd, "%s/%s\n", base, p);
 		else
 			sout(csd, "Paste error.\n");
 		close(csd);
