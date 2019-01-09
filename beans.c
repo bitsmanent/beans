@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -19,6 +20,7 @@ char *argv0;
 char port[8] = "2023";
 char base[256] = "";
 char path[256] = "/tmp";
+char mode[8] = "0600";
 
 /* function implementations */
 void
@@ -107,8 +109,9 @@ main(int argc, char *argv[]) {
 	char tmpfn[64] = {0}, *buf, *code;
 
 	ARGBEGIN {
-	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
 	case 'b': strncpy(base, EARGF(die("%s: missing base URL\n", argv0)), sizeof base); break;
+	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
+	case 'm': strncpy(mode, EARGF(die("%s: missing mode\n", argv0)), sizeof mode); break;
 	case 'p': strncpy(port, EARGF(die("%s: missing port\n", argv0)), sizeof port); break;
 	case 'v': die("beans-"VERSION"\n");
 	} ARGEND
@@ -142,6 +145,7 @@ main(int argc, char *argv[]) {
 			sout(csd, "%s%s\n", base, code);
 		else
 			sout(csd, "%s\n", code);
+		fchmod(tmpsd, strtol(mode, 0, 8));
 		close(csd);
 		close(tmpsd);
 		free(buf);
