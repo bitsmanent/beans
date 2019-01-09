@@ -104,7 +104,7 @@ main(int argc, char *argv[]) {
 	struct sockaddr_storage conn;
 	socklen_t size;
 	int sd, csd, len, tmpsd;
-	char tmpfn[64] = {0}, *buf, *p;
+	char tmpfn[64] = {0}, *buf, *code;
 
 	ARGBEGIN {
 	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
@@ -137,11 +137,11 @@ main(int argc, char *argv[]) {
 		}
 		if(write(tmpsd, buf, len) == -1)
 			fprintf(stderr, "write(): %s\n", strerror(errno));
-		p = strchr(tmpfn, '.');
-		if(p && ++p)
-			sout(csd, "%s/%s\n", base, p);
+		code = strchr(tmpfn, '.')+1;
+		if(*base)
+			sout(csd, "%s%s\n", base, code);
 		else
-			sout(csd, "Paste error.\n");
+			sout(csd, "%s\n", code);
 		close(csd);
 		close(tmpsd);
 		free(buf);
