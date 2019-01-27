@@ -13,14 +13,23 @@
 
 #include "arg.h"
 
-#define BACKLOG 32 /* XXX What's a reasonable value? */
+#define BACKLOG 32
 
+/* function declarations */
+void die(const char *errstr, ...);
+int bindon(char *port);
+void *ecalloc(size_t nmemb, size_t size);
+char *readall(int sd, int *len);
+void run(void);
+void sout(int sd, char *fmt, ...);
+
+/* variables */
 char *argv0;
-
 char port[8] = "2023";
 char base[256] = "";
 char path[256] = "/tmp";
 char mode[8] = "0600";
+int sockd;
 
 /* function implementations */
 void
@@ -90,36 +99,15 @@ readall(int sd, int *len) {
 }
 
 void
-sout(int sd, char *fmt, ...) {
-	va_list ap;
-	char buf[4096];
-	int sz;
-
-	va_start(ap, fmt);
-	sz = vsnprintf(buf, sizeof buf, fmt, ap);
-	va_end(ap);
-	send(sd, buf, sz, 0);
-}
-
-int
-main(int argc, char *argv[]) {
+run(void) {
 	struct sockaddr_storage conn;
 	socklen_t size;
-	int sd, csd, len, tmpsd;
+	int csd, len, tmpsd;
 	char tmpfn[64] = {0}, *buf, *code;
 
-	ARGBEGIN {
-	case 'b': strncpy(base, EARGF(die("%s: missing base URL\n", argv0)), sizeof base); break;
-	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
-	case 'm': strncpy(mode, EARGF(die("%s: missing mode\n", argv0)), sizeof mode); break;
-	case 'p': strncpy(port, EARGF(die("%s: missing port\n", argv0)), sizeof port); break;
-	case 'v': die("beans-"VERSION"\n");
-	} ARGEND
-
-	sd = bindon(port);
 	size = sizeof conn;
 	while(1) {
-		csd = accept(sd, (struct sockaddr *)&conn, &size);
+		csd = accept(sockd, (struct sockaddr *)&conn, &size);
 		if(csd == -1) {
 			fprintf(stderr, "accept(): %s", strerror(errno));
 			continue;
@@ -150,6 +138,32 @@ main(int argc, char *argv[]) {
 		close(tmpsd);
 		free(buf);
 	}
-	close(sd);
+}
+
+void
+sout(int sd, char *fmt, ...) {
+	va_list ap;
+	char buf[4096];
+	int sz;
+
+	va_start(ap, fmt);
+	sz = vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+	send(sd, buf, sz, 0);
+}
+
+int
+main(int argc, char *argv[]) {
+	ARGBEGIN {
+	case 'b': strncpy(base, EARGF(die("%s: missing base URL\n", argv0)), sizeof base); break;
+	case 'd': strncpy(path, EARGF(die("%s: missing path\n", argv0)), sizeof path); break;
+	case 'm': strncpy(mode, EARGF(die("%s: missing mode\n", argv0)), sizeof mode); break;
+	case 'p': strncpy(port, EARGF(die("%s: missing port\n", argv0)), sizeof port); break;
+	case 'v': die("beans-"VERSION"\n");
+	} ARGEND
+
+	sockd = bindon(port);
+	run();
+	close(sockd);
 	return 0;
 }
