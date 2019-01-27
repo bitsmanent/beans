@@ -105,11 +105,15 @@ run(void) {
 	int csd, len, tmpsd;
 	char tmpfn[64] = {0}, *buf, *code;
 
-	size = sizeof conn;
 	while(1) {
+		size = sizeof conn;
 		csd = accept(sockd, (struct sockaddr *)&conn, &size);
 		if(csd == -1) {
 			fprintf(stderr, "accept(): %s", strerror(errno));
+			continue;
+		}
+		if(fork()) {
+			close(csd);
 			continue;
 		}
 		buf = readall(csd, &len);
@@ -137,6 +141,7 @@ run(void) {
 		close(csd);
 		close(tmpsd);
 		free(buf);
+		break;
 	}
 }
 
