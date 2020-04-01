@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "arg.h"
 
@@ -21,6 +22,7 @@ int bindon(char *port);
 void *ecalloc(size_t nmemb, size_t size);
 char *readall(int sd, int *len);
 void run(void);
+void serve(int sd);
 void sout(int sd, char *fmt, ...);
 
 /* variables */
@@ -102,8 +104,8 @@ void
 run(void) {
 	struct sockaddr_storage conn;
 	socklen_t size;
-	int csd, len, tmpsd;
-	char tmpfn[64] = {0}, *buf, *code;
+	int csd;
+	pid_t pid;
 
 	while(1) {
 		size = sizeof conn;
@@ -112,37 +114,47 @@ run(void) {
 			fprintf(stderr, "accept(): %s", strerror(errno));
 			continue;
 		}
-		if(fork()) {
+		pid = fork();
+		if(pid) {
+			if(pid == -1)
+				fprintf(stderr, "fork(): %s\n", strerror(errno));
 			close(csd);
 			continue;
 		}
-		buf = readall(csd, &len);
-		if(!(buf && len)) {
-			sout(csd, "Nothing pasted.\n");
-			close(csd);
-			continue;
-		}
-		snprintf(tmpfn, sizeof tmpfn, "%s/beans.XXXXXX", path);
-		tmpsd = mkstemp(tmpfn);
-		if(tmpsd == -1) {
-			fprintf(stderr, "mkstemp()\n");
-			free(buf);
-			close(csd);
-			continue;
-		}
-		if(write(tmpsd, buf, len) == -1)
-			fprintf(stderr, "write(): %s\n", strerror(errno));
-		code = strchr(tmpfn, '.')+1;
-		if(*base)
-			sout(csd, "%s%s\n", base, code);
-		else
-			sout(csd, "%s\n", code);
-		fchmod(tmpsd, strtol(mode, 0, 8));
+		serve(csd);
 		close(csd);
-		close(tmpsd);
-		free(buf);
 		break;
 	}
+}
+
+void
+serve(int sd) {
+	int len, tmpsd;
+	char *buf, *code;
+	char tmpfn[64] = {0};
+
+	buf = readall(sd, &len);
+	if(!(buf && len)) {
+		sout(sd, "Nothing pasted.\n");
+		return;
+	}
+	snprintf(tmpfn, sizeof tmpfn, "%s/beans.XXXXXX", path);
+	tmpsd = mkstemp(tmpfn);
+	if(tmpsd == -1) {
+		fprintf(stderr, "mkstemp()\n");
+		free(buf);
+		return;
+	}
+	if(write(tmpsd, buf, len) == -1)
+		fprintf(stderr, "write(): %s\n", strerror(errno));
+	code = strchr(tmpfn, '.')+1;
+	if(*base)
+		sout(sd, "%s%s\n", base, code);
+	else
+		sout(sd, "%s\n", code);
+	fchmod(tmpsd, strtol(mode, 0, 8));
+	close(tmpsd);
+	free(buf);
 }
 
 void
@@ -168,6 +180,7 @@ main(int argc, char *argv[]) {
 	} ARGEND
 
 	sockd = bindon(port);
+	signal(SIGCHLD, SIG_IGN); /* cleanup zombies */
 	run();
 	close(sockd);
 	return 0;
