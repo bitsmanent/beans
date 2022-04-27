@@ -15,12 +15,13 @@
 #include "arg.h"
 
 #define BACKLOG 32
+#define MAXSIZE 32000 /* in bytes */
 
 /* function declarations */
 void die(const char *errstr, ...);
 int bindon(char *port);
 void *ecalloc(size_t nmemb, size_t size);
-char *readall(int sd, int *len);
+char *readall(int sd, int *len, int limit);
 void run(void);
 void serve(int sd);
 void sout(int sd, char *fmt, ...);
@@ -75,17 +76,24 @@ ecalloc(size_t nmemb, size_t size) {
 }
 
 char *
-readall(int sd, int *len) {
+readall(int sd, int *len, int limit) {
 	char *buf;
 	int sz = 512, r, l = 0;
+
+	if(limit && sz > limit)
+		sz = limit;
 
 	buf = ecalloc(1, sz);
 	while((r = read(sd, &buf[l], sz - l)) != -1) {
 		if(!r)
 			break;
 		l += r;
+		if(limit && l == limit)
+			break;
 		if(l == sz) {
 			sz *= 2;
+			if(limit && sz > limit)
+				sz = limit;
 			if(!(buf = realloc(buf, sz)))
 				die("realloc()\n");
 		}
@@ -131,9 +139,9 @@ void
 serve(int sd) {
 	int len, tmpsd;
 	char *buf, *code;
-	char tmpfn[64] = {0};
+	char tmpfn[320] = {0};
 
-	buf = readall(sd, &len);
+	buf = readall(sd, &len, MAXSIZE);
 	if(!(buf && len)) {
 		sout(sd, "Nothing pasted.\n");
 		return;
